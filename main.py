@@ -7,6 +7,10 @@ from datetime import datetime
 import logging
 import statistics
 import json
+import ssl
+
+# SSL FIX: Add this at the TOP of main.py (right after imports)
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -323,11 +327,4 @@ async def websocket_stream(websocket: WebSocket, symbol: str, client_id: str):
             manager.disconnect(client_id)
             
             # Remove from all subscriptions
-
             await remove_client_from_all_subscriptions(client_id)
-
-import os
-print("=== FILES IN DIRECTORY ===")
-for file in os.listdir('.'):
-    print(f"Found: {file}")
-print("=== END FILES ===")

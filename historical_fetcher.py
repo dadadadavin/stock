@@ -58,7 +58,7 @@ USER_INTERVAL_MAPPING = {
     "3mo": "1d",
     "6mo": "1d",
     "1y": "1d",
-    "2y": "1wk",
+    "2y": "1d",
     "5y": "1wk",
     "10y": "1mo",
     "ytd": "1d",

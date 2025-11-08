@@ -21,6 +21,10 @@ import time
 import json
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
+import ssl
+
+# SSL FIX for Railway deployment
+ssl._create_default_https_context = ssl._create_unverified_context
 
 import requests
 from bs4 import BeautifulSoup
@@ -28,17 +32,6 @@ from googletrans import Translator
 import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
-import traceback
-print("[fund_sentiment] module loaded")
-
-def run(*args, **kwargs):
-    print("[fund_sentiment] run() called with:", args, kwargs)
-    try:
-        ...
-    except Exception as e:
-        traceback.print_exc()
-        raise
 
 # --------- Config ---------
 DEFAULT_API_URL = "http://127.0.0.1:8000/news"  # use --post to send
@@ -53,8 +46,14 @@ def scrape_google_news(query: str, last_x_days: int, limit: int) -> List[Tuple[s
     q = query.replace(" ", "+")
     url = f"https://news.google.com/search?q={q}+when%3A{last_x_days}d&hl=id&gl=ID&ceid=ID:id"
     headers = {"User-Agent": USER_AGENT}
-    r = requests.get(url, headers=headers, timeout=10)
-    r.raise_for_status()
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        print(f"[WARN] Failed to fetch Google News for query '{query}': {e}")
+        return []
+    
     soup = BeautifulSoup(r.text, "html.parser")
     results = []
     # flexible selectors because Google News HTML keeps changing
@@ -83,25 +82,34 @@ def dedupe_items(items: List[Tuple[str,str]]) -> List[Tuple[str,str]]:
     return out
 
 def load_finbert(device: torch.device):
-    tokenizer = AutoTokenizer.from_pretrained("yiyanghkust/finbert-tone")
-    model = AutoModelForSequenceClassification.from_pretrained("yiyanghkust/finbert-tone")
-    model.to(device)
-    model.eval()
-    return tokenizer, model
+    try:
+        tokenizer = AutoTokenizer.from_pretrained("yiyanghkust/finbert-tone")
+        model = AutoModelForSequenceClassification.from_pretrained("yiyanghkust/finbert-tone")
+        model.to(device)
+        model.eval()
+        return tokenizer, model
+    except Exception as e:
+        print(f"[ERROR] Failed to load FinBERT model: {e}")
+        # Return dummy tokenizer/model that will always return neutral
+        return None, None
 
 def analyze_finbert(text: str, tokenizer, model, device) -> Tuple[str, Tuple[float,float,float]]:
     # returns (label, (pos, neu, neg)) percentages
-    if not text:
+    if not text or tokenizer is None or model is None:
         return "Neutral", (0.0, 100.0, 0.0)
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(device)
-    with torch.no_grad():
-        logits = model(**inputs).logits
-    probs = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()[0]  # order: positive, neutral, negative
-    labs = ["Positive", "Neutral", "Negative"]
-    label = labs[int(np.argmax(probs))]
-    pct = tuple((probs * 100.0).round(2).tolist())
-
-    return label, pct
+    
+    try:
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(device)
+        with torch.no_grad():
+            logits = model(**inputs).logits
+        probs = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()[0]  # order: positive, neutral, negative
+        labs = ["Positive", "Neutral", "Negative"]
+        label = labs[int(np.argmax(probs))]
+        pct = tuple((probs * 100.0).round(2).tolist())
+        return label, pct
+    except Exception as e:
+        print(f"[ERROR] Failed to analyze sentiment: {e}")
+        return "Neutral", (0.0, 100.0, 0.0)
 
 # --------- main flow ---------
 def run(ticker: str, days: int, qty: int, post: bool=False, api_url: str=DEFAULT_API_URL, pause: float=0.2) -> Dict[str,Any]:
@@ -142,6 +150,7 @@ def run(ticker: str, days: int, qty: int, post: bool=False, api_url: str=DEFAULT
             label, (p_pos, p_neu, p_neg) = analyze_finbert(translated, tokenizer, model, device)
         except Exception as e:
             # fallback to neutral
+            print(f"[WARN] Sentiment analysis failed for '{title}': {e}")
             label, (p_pos, p_neu, p_neg) = "Neutral", (0.0, 100.0, 0.0)
         items.append({
             "number": i,
@@ -201,4 +210,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
