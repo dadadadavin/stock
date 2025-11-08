@@ -8,7 +8,11 @@ import logging
 import statistics
 import json
 import ssl
+import sys
+import os
 
+# Fix for Railway deployment - add current directory to Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # SSL FIX: Add this at the TOP of main.py (right after imports)
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -328,3 +332,4 @@ async def websocket_stream(websocket: WebSocket, symbol: str, client_id: str):
             
             # Remove from all subscriptions
             await remove_client_from_all_subscriptions(client_id)
+
