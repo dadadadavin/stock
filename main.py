@@ -323,4 +323,11 @@ async def websocket_stream(websocket: WebSocket, symbol: str, client_id: str):
             manager.disconnect(client_id)
             
             # Remove from all subscriptions
+
             await remove_client_from_all_subscriptions(client_id)
+
+import os
+print("=== FILES IN DIRECTORY ===")
+for file in os.listdir('.'):
+    print(f"Found: {file}")
+print("=== END FILES ===")
