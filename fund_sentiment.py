@@ -29,6 +29,17 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
+import traceback
+print("[fund_sentiment] module loaded")
+
+def run(*args, **kwargs):
+    print("[fund_sentiment] run() called with:", args, kwargs)
+    try:
+        ...
+    except Exception as e:
+        traceback.print_exc()
+        raise
+
 # --------- Config ---------
 DEFAULT_API_URL = "http://127.0.0.1:8000/news"  # use --post to send
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -190,3 +201,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
